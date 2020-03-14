@@ -1,4 +1,5 @@
 import datetime
+import json
 import unittest
 
 
@@ -8,6 +9,11 @@ def get_date_range_from_year_and_week(year: int, week: int) -> tuple:
     last = first + datetime.timedelta(days=6.9)
     return first, last
 
+
+def load_credentials(config_filename: str) -> dict:
+    # respects Inan's configuration
+    with open(config_filename, 'r') as credentials:
+        return json.load(credentials)
 
 class TestISOWeek(unittest.TestCase):
 
@@ -25,3 +31,10 @@ class TestISOWeek(unittest.TestCase):
         first, last = get_date_range_from_year_and_week(2020, 9)
         self.assertEqual(first, datetime.date(2020, 2, 24))
         self.assertEqual(last, datetime.date(2020, 3, 1))
+
+class TestLoadSampleCredentials(unittest.TestCase):
+
+    def test_sample_json(self):
+        credentials = load_credentials('sample_credentials.json')
+        self.assertEqual(credentials['jira_server'], 'YOUR_SERVER')
+        self.assertEqual(credentials['jira_user'], 'YOUR_USERNAME')
