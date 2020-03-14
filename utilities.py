@@ -10,11 +10,6 @@ def get_date_range_from_year_and_week(year: int, week: int) -> tuple:
     return first, last
 
 
-def load_credentials(config_filename: str) -> dict:
-    # respects Inan's configuration
-    with open(config_filename, 'r') as credentials:
-        return json.load(credentials)
-
 class TestISOWeek(unittest.TestCase):
 
     def test_first_week(self):
@@ -32,9 +27,32 @@ class TestISOWeek(unittest.TestCase):
         self.assertEqual(first, datetime.date(2020, 2, 24))
         self.assertEqual(last, datetime.date(2020, 3, 1))
 
+
+def load_credentials(config_filename: str) -> dict:
+    # respects Inan's configuration
+    with open(config_filename, 'r') as credentials:
+        return json.load(credentials)
+
+
 class TestLoadSampleCredentials(unittest.TestCase):
 
     def test_sample_json(self):
         credentials = load_credentials('sample_credentials.json')
         self.assertEqual(credentials['jira_server'], 'YOUR_SERVER')
         self.assertEqual(credentials['jira_user'], 'YOUR_USERNAME')
+
+# not that good, but we'll see what we need
+def build_jql_string_from_dict(parameters: dict, boolean : str = 'AND', operator : str = '='):
+    return ' {} '.format(boolean).join(['{} {} {}'.format(k,operator,v) for (k, v) in parameters.items()])
+
+
+class TestBuildJQLString(unittest.TestCase):
+
+    def test_defaults(self):
+        self.assertEqual(build_jql_string_from_dict({'project' : 'pizza', 'feature' : 'toppings'}), 'project = pizza AND feature = toppings')
+
+    def test_args(self):
+        self.assertEqual(build_jql_string_from_dict({'project' : 'pizza', 'issue' : '10000'}, 'OR', '>'), 'project > pizza OR issue > 10000')
+
+    def test_compose(self):
+        self.assertEqual(' AND '.join([build_jql_string_from_dict({'project' : 'pizza', 'feature' : 'toppings'}), build_jql_string_from_dict({'cost' : '100', 'price' : '200'}, 'OR', '>')]), 'project = pizza AND feature = toppings AND cost > 100 OR price > 200')
