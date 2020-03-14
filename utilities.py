@@ -41,18 +41,24 @@ class TestLoadSampleCredentials(unittest.TestCase):
         self.assertEqual(credentials['jira_server'], 'YOUR_SERVER')
         self.assertEqual(credentials['jira_user'], 'YOUR_USERNAME')
 
+
 # not that good, but we'll see what we need
-def build_jql_string_from_dict(parameters: dict, boolean : str = 'AND', operator : str = '='):
-    return ' {} '.format(boolean).join(['{} {} {}'.format(k,operator,v) for (k, v) in parameters.items()])
+def build_jql_string_from_dict(parameters: dict, boolean: str = 'AND', operator: str = '='):
+        return f' {boolean} '.join([f'{k} {operator} {v}' for (k, v) in parameters.items()])
+
 
 
 class TestBuildJQLString(unittest.TestCase):
 
     def test_defaults(self):
-        self.assertEqual(build_jql_string_from_dict({'project' : 'pizza', 'feature' : 'toppings'}), 'project = pizza AND feature = toppings')
+        self.assertEqual(build_jql_string_from_dict({'project': 'pizza', 'feature': 'toppings'}),
+                         'project = pizza AND feature = toppings')
 
     def test_args(self):
-        self.assertEqual(build_jql_string_from_dict({'project' : 'pizza', 'issue' : '10000'}, 'OR', '>'), 'project > pizza OR issue > 10000')
+        self.assertEqual(build_jql_string_from_dict({'project': 'pizza', 'issue': '10000'}, 'OR', '>'),
+                         'project > pizza OR issue > 10000')
 
     def test_compose(self):
-        self.assertEqual(' AND '.join([build_jql_string_from_dict({'project' : 'pizza', 'feature' : 'toppings'}), build_jql_string_from_dict({'cost' : '100', 'price' : '200'}, 'OR', '>')]), 'project = pizza AND feature = toppings AND cost > 100 OR price > 200')
+        self.assertEqual(' AND '.join([build_jql_string_from_dict({'project': 'pizza', 'feature': 'toppings'}),
+                                       build_jql_string_from_dict({'cost': '100', 'price': '200'}, 'OR', '>')]),
+                         'project = pizza AND feature = toppings AND cost > 100 OR price > 200')
