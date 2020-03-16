@@ -2,9 +2,8 @@ import argparse
 import datetime
 
 from jira import JIRA
+from jira_utilities import get_datetime_from_property_holder, recursive_search_for_property_dict
 from utilities import load_credentials, get_jira_date_string_from_datetime
-from jira_utilities import get_datetime_from_property_holder, search_issue_history_for_property_dict, sort_issue_history_by_date
-from my_transitions import active_development_transitions, inactive_development_transitions
 
 
 def main(args):
@@ -23,36 +22,25 @@ def main(args):
         # fetch full issue
         full_issue = jira.issue(issue.key, expand='changelog', fields='assignee')
 
-        # get all transitions where work started
-        # started_list = search_changelog(full_issue, [active_development_transitions.any_to_doing],
-        #                                 sort_issue_history_by_date)
-        #
-        # # get all transitions where work stopped
-        # stopped_list = search_changelog(full_issue, [inactive_development_transitions.any_to_blocked,
-        #                                               inactive_development_transitions.any_to_icebox,
-        #                                               inactive_development_transitions.doing_to_todo,
-        #                                               inactive_development_transitions.test_to_verified,
-        #                                               inactive_development_transitions.legacy_doing_to_done],
-        #                                  sort_issue_history_by_date)
+        status_changes = []
+        for property_holder in full_issue.changelog.histories:
 
-        status_changes = search_changelog(full_issue, [{'field' : 'status'}], sort_issue_history_by_date)
+            # for each entry in histories, see if we have any matches
+            # this should always be 1, but i dunno.
+            found_matches = recursive_search_for_property_dict(property_holder, {'field': 'status'})
+            assert (len(found_matches) <= 1)
+
+            # if have a match, add a tuple of top level property, and the status change found in its subtree
+            if found_matches:
+                status_changes.append((property_holder, found_matches))
+
+        # sort status changes by date
+        status_changes.sort(key=(lambda t: get_datetime_from_property_holder(t[0])))
 
         build_transition_list(issue, status_changes)
 
         print(full_issue)
         print(f'has {len(status_changes)} status changes')
-        #print(f'has {len(stopped_list)} stops')
-
-
-def search_changelog(issue, property_dicts_to_match: list, sort_func: None) -> list:
-    results_list = []
-
-    for prop_dict in property_dicts_to_match:
-        results_list = results_list + search_issue_history_for_property_dict(issue, prop_dict)
-
-    if sort_func:
-        results_list = sort_func(results_list)
-    return results_list
 
 
 def build_transition_list(issue, transitions) -> list:
@@ -65,9 +53,13 @@ def build_transition_list(issue, transitions) -> list:
         print(transition)
 
         # get only the status changes
-        status_changes = search_issue_history_for_property_dict(transition.items, {'field' : 'status'})
+        # status_changes = search_issue_itemlist_for_property_dict(transition, {'field' : 'status'})
+        status_changes = recursive_search_for_property_dict(transition, {'field': 'status'})
 
-        transition_list.append((transition.items[0].toString, transition.author, None))
+        # transition_list.append((transition.items[0].toString, transition.author, None))
+
+    return transition_list
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Show JIRA activity for a project by week for a year')

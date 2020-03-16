@@ -1,24 +1,49 @@
 from datetime import datetime
 
+import unittest
+from unittest.mock import Mock
 
-# I don't know enough about how JIRA stores its nested property lists to avoid the n*m complexity
-def search_issue_history_for_property_dict(issue, match: dict):
+def check_dict_match(item, match: dict) -> bool:
+    for (k, v) in match.items():
+        try:
+            if getattr(item, k) != v:
+                return False
+        except AttributeError:
+            return False
+    return True
+
+
+class TestDictMatch(unittest.TestCase):
+
+    def testMatch(self):
+        self.assertTrue(check_dict_match({}, {}))
+        m = Mock()
+        m.a = 'a'
+        self.assertTrue(check_dict_match(m, {'a': 'a'}))
+        m.b = 'b';
+        self.assertTrue(check_dict_match(m, {'a': 'a'}))
+        self.assertTrue(check_dict_match(m, {'a': 'a', 'b': 'b'}))
+
+    def testDidNotMatch(self):
+        m = Mock()
+        m.a = 'b'
+        self.assertFalse(check_dict_match(m, {'a': 'a'}))
+        m.r = []
+        self.assertFalse(check_dict_match(m, {'a': 'a'}))
+        self.assertFalse(check_dict_match(m, {'missing': 'a'}))
+
+
+# call it on a top level thing with items
+def recursive_search_for_property_dict(top_level, match: dict) -> list:
     matches = []
-    for property_holder in issue.changelog.histories:
-        for item in property_holder.items:
 
-            # filtering all items that are either missing or don't match
-            def filter_function(_tuple):
-                try:
-                    return getattr(item, _tuple[0]) != _tuple[1]  # closed over item from outside scope
-                except AttributeError:
-                    return True
+    if check_dict_match(top_level, match):
+        matches.append(top_level)
 
-            # filter out all attributes that don't match
-            iterator = filter(filter_function, match.items())
-
-            if not dict(iterator):
-                matches.append(property_holder)
+    # does the property holder have children (.items) ?
+    if hasattr(top_level, 'items'):
+        for property_holder in top_level.items:
+            matches = matches + recursive_search_for_property_dict(property_holder, match)
 
     return matches
 
@@ -26,12 +51,4 @@ def search_issue_history_for_property_dict(issue, match: dict):
 def get_datetime_from_property_holder(property_holder):
     # we don't care about ms, and strptime doesn't do well with offset timezones
     return datetime.strptime(property_holder.created.split('.')[0], "%Y-%m-%dT%H:%M:%S")
-
-
-def sort_key_for_property_holder(property_holder):
-    return get_datetime_from_property_holder(property_holder)
-
-
-def sort_issue_history_by_date(history : list) -> list:
-    return sorted(history, key=sort_key_for_property_holder)
 
