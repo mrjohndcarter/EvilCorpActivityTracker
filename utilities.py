@@ -1,6 +1,7 @@
 import datetime
 import json
 import unittest
+from time import strptime
 
 
 def get_date_range_from_year_and_week(year: int, week: int) -> tuple:
@@ -43,9 +44,8 @@ class TestLoadSampleCredentials(unittest.TestCase):
 
 
 # not that good, but we'll see what we need
-def build_jql_string_from_dict(parameters: dict, boolean: str = 'AND', operator: str = '='):
-        return f' {boolean} '.join([f'{k} {operator} {v}' for (k, v) in parameters.items()])
-
+def build_jql_string_from_dict(parameters: dict, boolean: str = 'AND', operator: str = '=') -> str:
+    return f' {boolean} '.join([f'{k} {operator} {v}' for (k, v) in parameters.items()])
 
 
 class TestBuildJQLString(unittest.TestCase):
@@ -62,3 +62,14 @@ class TestBuildJQLString(unittest.TestCase):
         self.assertEqual(' AND '.join([build_jql_string_from_dict({'project': 'pizza', 'feature': 'toppings'}),
                                        build_jql_string_from_dict({'cost': '100', 'price': '200'}, 'OR', '>')]),
                          'project = pizza AND feature = toppings AND cost > 100 OR price > 200')
+
+
+def get_jira_date_string_from_datetime(d: datetime) -> str:
+    return d.strftime('%Y-%m-%d')
+
+
+class TestGetJiraDate(unittest.TestCase):
+
+    def test_from_datetime(self):
+        self.assertEqual(get_jira_date_string_from_datetime(datetime.date(2020, 2, 24)), '2020-02-24')
+
