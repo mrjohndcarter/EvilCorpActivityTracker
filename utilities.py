@@ -1,7 +1,6 @@
 import datetime
 import json
 import unittest
-from time import strptime
 
 
 def get_date_range_from_year_and_week(year: int, week: int) -> tuple:
