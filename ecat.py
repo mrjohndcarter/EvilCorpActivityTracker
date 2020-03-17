@@ -1,6 +1,7 @@
 import argparse
-import datetime
 
+from datetime import date, datetime
+from itertools import tee
 from jira import JIRA
 from jira_utilities import get_datetime_from_property_holder, recursive_search_for_property_dict
 from utilities import load_credentials, get_jira_date_string_from_datetime
@@ -10,13 +11,14 @@ def main(args):
     creds = load_credentials('./private.json')
     jira = JIRA({"server": creds['jira_server']}, basic_auth=(creds['jira_user'], creds['jira_apikey']))
 
-    jql_string = f'project = core AND status was DOING during ({get_jira_date_string_from_datetime(datetime.date(args.year, 1, 1))}, {get_jira_date_string_from_datetime(datetime.date(args.year, 12, 31))})'
+    jql_string = f'project = core AND status was DOING during ({get_jira_date_string_from_datetime(date(args.year, 1, 1))}, {get_jira_date_string_from_datetime(date(args.year, 12, 31))})'
+    #jql_string = f'issue = US-11247'
 
     print(f'=* Evil Corp Activity Tracker *=')
     print(f'Query String: {jql_string}')
 
     issues_returned = jira.search_issues(jql_string)
-    print(f'Yielded {len(issues_returned)}')
+    print(f'Yielded {len(issues_returned)} results')
 
     for issue in issues_returned:
         # fetch full issue
@@ -37,28 +39,34 @@ def main(args):
         # sort status changes by date
         status_changes.sort(key=(lambda t: get_datetime_from_property_holder(t[0])))
 
-        build_transition_list(issue, status_changes)
+        history = build_history(issue, status_changes)
 
         print(full_issue)
         print(f'has {len(status_changes)} status changes')
+        print(history)
 
-
-def build_transition_list(issue, transitions) -> list:
+def build_history(issue, status_change_tuples : list) -> list:
     # return a list of tuples of the form:
-    # (state, who, time spent in state)
-    # first state is always 'open' with reporter as who
-    transition_list = [('Open', issue.fields.reporter, None)]
+    # (state, who had it in this state, time spent in state)
+    state_history = [];
 
-    for transition in transitions:
-        print(transition)
+    fromIt, ToIt = tee(status_change_tuples)
 
-        # get only the status changes
-        # status_changes = search_issue_itemlist_for_property_dict(transition, {'field' : 'status'})
-        status_changes = recursive_search_for_property_dict(transition, {'field': 'status'})
+    # move to first state in list
+    toState = next(ToIt) # get the first state we moved to
 
-        # transition_list.append((transition.items[0].toString, transition.author, None))
+    # first state is always 'open' with reporter as who created it
+    # open time is the time until someone touched it
+    state_history.append(('Open', issue.fields.reporter.displayName , get_datetime_from_property_holder(toState[0]) - get_datetime_from_property_holder(issue.fields)));
 
-    return transition_list
+    for toState in ToIt:
+        fromState = next(fromIt)
+        state_history.append((fromState[1][0].toString, fromState[0].author.displayName, get_datetime_from_property_holder(toState[0]) - get_datetime_from_property_holder(fromState[0])))
+
+    # add final state, and time it has been in that state
+    state_history.append((toState[1][0].toString, toState[0].author.displayName, datetime.now() - get_datetime_from_property_holder(toState[0])))
+
+    return state_history
 
 
 if __name__ == "__main__":
