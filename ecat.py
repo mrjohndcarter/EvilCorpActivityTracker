@@ -73,10 +73,12 @@ def main(args):
 def aggregate_states_from_history(history: list) -> (defaultdict, defaultdict):
     state_with_time = defaultdict(timedelta)
     state_with_who = defaultdict(list)
+
     for (state, name, delta) in history:
         state_with_time[state] = state_with_time[state] + delta
         state_with_who[state].append(name)
-    return (state_with_time, state_with_who)
+
+    return state_with_time, state_with_who
 
 
 def build_history(issue, status_change_tuples: list) -> list:
@@ -139,7 +141,7 @@ class TestDictMatch(unittest.TestCase):
         self.assertFalse(check_dict_match(m, {'missing': 'a'}))
 
 
-# call it on a top level thing with items
+# for a jira.PropertyHolder, will search it and the items beneath it (recursive, pre-order)
 def recursive_search_for_property_dict(top_level, match: dict) -> list:
     matches = []
 
@@ -174,8 +176,6 @@ if __name__ == "__main__":
     parser.add_argument('jql', type=str, help='JQL query string'),
     parser.add_argument('--config', type=str,
                         help='JSON config file containing credentials (see sample_credentials.json)')
-    parser.add_argument('--project', type=str, help='JIRA project name')
-    parser.add_argument('--year', type=int, help='year to show')
     parser.add_argument('--prefix', type=str, help='Prefix URL for link to JIRA')
     parser.add_argument('--output', type=str, help='File to output csv to')
     args = parser.parse_args()
