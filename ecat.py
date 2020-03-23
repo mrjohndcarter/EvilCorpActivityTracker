@@ -22,7 +22,7 @@ def main(args):
     print(f'=* Evil Corp Activity Tracker *=')
     print(f'Query String: {args.jql}')
 
-    issues_returned = jira.search_issues(args.jql, maxResults=False)
+    issues_returned = jira.search_issues(args.jql, maxResults=False, expand='changelog')
     print(f' * Yielded {len(issues_returned)} results')
     print(f' * Processing ', end='')
 
@@ -30,12 +30,9 @@ def main(args):
 
         print('.', end='')
 
-        # fetch full issue to expand changelog
-        full_issue = jira.issue(issue.key, expand='changelog')
-
         # build the list of all status changes for this issue
         status_changes = []
-        for property_holder in full_issue.changelog.histories:
+        for property_holder in issue.changelog.histories:
 
             # for each entry in histories, see if we have any matches
             # this should always be 1, but i dunno.
