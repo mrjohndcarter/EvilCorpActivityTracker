@@ -99,7 +99,7 @@ def build_history(issue, status_change_tuples: list) -> list:
                           get_datetime_from_property_holder(toState[0]) - get_datetime_from_property_holder(
                               issue.fields)));
 
-    # construct sate from two adjacent transitions
+    # construct state from two adjacent transitions
     for toState in ToIt:
         fromState = next(fromIt)
         state_history.append((fromState[1][0].toString, fromState[0].author.displayName,
