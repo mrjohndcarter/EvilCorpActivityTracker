@@ -1,6 +1,6 @@
 # Evil Corp Activity Tracker
 
-Executes a JQL query and exports it to a CSV file.
+Executes a JQL query and exports insight about status changes of the query's results to a CSV file.
 
 ## Requirements
 
@@ -15,6 +15,7 @@ ecat.py (JQL String) --config private.json --output sep2019.csv --prefix https:/
 - config : JSON file containing credentials (see below)
 - output : csv file to output to, will overwrite
 - prefix : URL to prepend to any issue to build a URL to the issue
+- page_size : Number of issues to fetch per query
 
 ## Limitations
 - Probably tied to our JIRA schema
@@ -29,5 +30,4 @@ ecat.py (JQL String) --config private.json --output sep2019.csv --prefix https:/
 }
 
 ## TODO
-- could probably page query if you weren't evil
 - fields and headers are hardcoded

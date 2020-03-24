@@ -20,43 +20,59 @@ def main(args):
     row_list = []
 
     print(f'=* Evil Corp Activity Tracker *=')
-    print(f'Query String: {args.jql}')
+    print(f'* Query String: {args.jql}')
+    print(f'* Page size: {args.page_size}')
 
-    issues_returned = jira.search_issues(args.jql, maxResults=False, expand='changelog')
-    print(f' * Yielded {len(issues_returned)} results')
-    print(f' * Processing ', end='')
+    if args.page_size > 100:
+        # this seems to be a jira module limitation
+        print(f'* Page size too large, reducing to 100 per query')
+        args.page_size = 100
 
-    for issue in issues_returned:
+    page_count = 0
+    more_pages = True
 
-        print('.', end='')
+    while more_pages:
 
-        # build the list of all status changes for this issue
-        status_changes = []
-        for property_holder in issue.changelog.histories:
+        issues_returned = jira.search_issues(args.jql, startAt=page_count * args.page_size, maxResults=args.page_size,
+                                             expand='changelog')
 
-            # for each entry in histories, see if we have any matches
-            # this should always be 1, but i dunno.
-            found_matches = recursive_search_for_property_dict(property_holder, {'field': 'status'})
-            assert (len(found_matches) <= 1)
+        more_pages = len(issues_returned) == args.page_size
+        page_count = page_count + 1
 
-            # if have a match, add a tuple of top level property, and the status change found in its subtree
-            if found_matches:
-                status_changes.append((property_holder, found_matches))
+        for issue in issues_returned:
 
-        # sort status changes by date
-        status_changes.sort(key=(lambda t: get_datetime_from_property_holder(t[0])))
+            print('.', end='')
 
-        # from the build history (built from issue and queried status changes), aggregate maps of states -> times/who
-        (states_with_time, states_with_who) = aggregate_states_from_history(build_history(issue, status_changes))
+            # build the list of all status changes for this issue
+            status_changes = []
+            for property_holder in issue.changelog.histories:
 
-        hyperlink_item = f'=HYPERLINK("{args.prefix}/{issue.key} ", "{issue.key}")'
+                # for each entry in histories, see if we have any matches
+                # this should always be 1, but i dunno.
+                found_matches = recursive_search_for_property_dict(property_holder, {'field': 'status'})
+                assert (len(found_matches) <= 1)
 
-        row_list.append([hyperlink_item,
-                         issue.fields.summary,
-                         states_with_time['Doing'].days,
-                         states_with_time['Test'].days,
-                         ', '.join(states_with_who['Doing']),
-                         ', '.join(states_with_who['Test'])])
+                # if have a match, add a tuple of top level property, and the status change found in its subtree
+                if found_matches:
+                    status_changes.append((property_holder, found_matches))
+
+            # sort status changes by date
+            status_changes.sort(key=(lambda t: get_datetime_from_property_holder(t[0])))
+
+            # from the build history (built from issue and queried status changes), aggregate maps of states -> times/who
+            (states_with_time, states_with_who) = aggregate_states_from_history(build_history(issue, status_changes))
+
+            # hyperlink syntax is an excel thing
+            hyperlink_item = f'=HYPERLINK("{args.prefix}/{issue.key} ", "{issue.key}")'
+
+            row_list.append([hyperlink_item,
+                             issue.fields.summary,
+                             states_with_time['Doing'].days,
+                             states_with_time['Test'].days,
+                             ', '.join(states_with_who['Doing']),
+                             ', '.join(states_with_who['Test'])])
+
+    print(f' * Yielded {len(row_list)} results')
 
     headers = ['Issue Link', 'Summary', 'Time in Doing (Days)', 'Time in Test (Days)', 'Who Worked on it (dev)',
                'Who Worked on it (test)']
@@ -174,8 +190,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Retrieve activity for a given JQL')
     parser.add_argument('jql', type=str, help='JQL query string'),
     parser.add_argument('--config', type=str,
-                        help='JSON config file containing credentials (see sample_credentials.json)')
-    parser.add_argument('--prefix', type=str, help='Prefix URL for link to JIRA')
-    parser.add_argument('--output', type=str, help='File to output csv to')
+                        help='JSON config file containing credentials (see sample_credentials.json)',
+                        default='private.json')
+    parser.add_argument('--prefix', type=str, help='Prefix URL for link to JIRA', default='')
+    parser.add_argument('--output', type=str, help='File to output csv to', default='output.csv')
+    parser.add_argument('--page_size', type=int, help='Page size for query', default=50)
     args = parser.parse_args()
     main(args)
