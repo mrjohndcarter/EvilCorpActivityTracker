@@ -9,9 +9,10 @@ Executes a JQL query and exports insight about status changes of the query's res
 
 ## Usage
 
-ecat.py (JQL String) --config private.json --output sep2019.csv --prefix https://youilabs.atlassian.net/browse
+ecat.py (JQL String) (States to Export) --config private.json --output sep2019.csv --prefix https://youilabs.atlassian.net/browse
 
 - JQL string : JQL 
+- comma separated list of states to export (e.g: Doing,Test), be careful with spaces.
 - config : JSON file containing credentials (see below)
 - output : csv file to output to, will overwrite
 - prefix : URL to prepend to any issue to build a URL to the issue
@@ -28,6 +29,3 @@ ecat.py (JQL String) --config private.json --output sep2019.csv --prefix https:/
   "jira_apikey" : "see https://id.atlassian.com/manage-profile/security",
   "browse_url_prefix" : "https://company.atlassian.net/browse/"
 }
-
-## TODO
-- fields and headers are hardcoded

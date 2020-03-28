@@ -23,6 +23,10 @@ def main(args):
     print(f'* Query String: {args.jql}')
     print(f'* Page size: {args.page_size}')
 
+    states = args.states.split(',')
+
+    print(f'* Dumping states: {",".join(states)}')
+
     if args.page_size > 100:
         # this seems to be a jira module limitation
         print(f'* Page size too large, reducing to 100 per query')
@@ -62,20 +66,24 @@ def main(args):
             # from the build history (built from issue and queried status changes), aggregate maps of states -> times/who
             (states_with_time, states_with_who) = aggregate_states_from_history(build_history(issue, status_changes))
 
-            # hyperlink syntax is an excel thing
-            hyperlink_item = f'=HYPERLINK("{args.prefix}/{issue.key} ", "{issue.key}")'
+            build_row = []
+            build_row.append(f'=HYPERLINK("{args.prefix}/{issue.key} ", "{issue.key}")')
+            build_row.append(issue.fields.summary)
 
-            row_list.append([hyperlink_item,
-                             issue.fields.summary,
-                             states_with_time['Doing'].days,
-                             states_with_time['Test'].days,
-                             ', '.join(states_with_who['Doing']),
-                             ', '.join(states_with_who['Test'])])
+            # for each state we're interested in exporting, dump the day count and who worked on it
+            for state in states:
+                build_row.append(states_with_time[state].days)
+                build_row.append(', '.join(states_with_who[state]))
+
+            row_list.append(build_row)
 
     print(f' * Yielded {len(row_list)} results')
 
-    headers = ['Issue Link', 'Summary', 'Time in Doing (Days)', 'Time in Test (Days)', 'Who Worked on it (dev)',
-               'Who Worked on it (test)']
+    headers = ['Issue Link', 'Summary']
+
+    for state in states:
+        headers.append(f'Time in {state} (Days)')
+        headers.append(f'Who while in {state}')
 
     print(' * Writing')
     with open(args.output, mode='w') as csv_file:
@@ -189,6 +197,7 @@ class TestGetJiraDate(unittest.TestCase):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Retrieve activity for a given JQL')
     parser.add_argument('jql', type=str, help='JQL query string'),
+    parser.add_argument('states', type=str, help='Comma separated list of states to export')
     parser.add_argument('--config', type=str,
                         help='JSON config file containing credentials (see sample_credentials.json)',
                         default='private.json')
