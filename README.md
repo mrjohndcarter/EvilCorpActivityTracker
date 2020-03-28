@@ -18,9 +18,6 @@ ecat.py (JQL String) (States to Export) --config private.json --output sep2019.c
 - prefix : URL to prepend to any issue to build a URL to the issue
 - page_size : Number of issues to fetch per query
 
-## Limitations
-- Probably tied to our JIRA schema
-
 ## Config
 
 {
