@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
 import csv
@@ -9,7 +9,9 @@ from datetime import datetime, timedelta
 from itertools import tee
 from unittest.mock import Mock
 
+import requests
 from jira import JIRA
+from jira.resources import dict2resource
 
 
 def main(args):
@@ -37,19 +39,20 @@ def main(args):
 
     while more_pages:
 
-        issues_returned = jira.search_issues(args.jql, startAt=page_count * args.page_size, maxResults=args.page_size,
-                                             expand='changelog')
+        issues_returned = jira.search_issues(args.jql, startAt=page_count * args.page_size, maxResults=args.page_size)
 
         more_pages = len(issues_returned) == args.page_size
-        page_count = page_count + 1
+        page_count += 1
 
         for issue in issues_returned:
 
-            print('.', end='')
+            # we need to full changelog separately and can't use jira-python
+            full_changelog_list = get_full_changelog(creds['jira_server'], creds['jira_user'], creds['jira_apikey'],
+                                                     issue.key)
 
             # build the list of all status changes for this issue
             status_changes = []
-            for property_holder in issue.changelog.histories:
+            for property_holder in full_changelog_list:
 
                 # for each entry in histories, see if we have any matches
                 # this should always be 1, but i dunno.
@@ -109,27 +112,28 @@ def build_history(issue, status_change_tuples: list) -> list:
     # (state, who had it in this state, time spent in state)
     state_history = [];
 
-    fromIt, ToIt = tee(status_change_tuples)
+    from_it, to_it = tee(status_change_tuples)
+
+    # there is some noise in the state -- not all workflows begin in the 'open' state
+    # advance until the first open state
 
     # move to first state in list
-    toState = next(ToIt)  # get the first state we moved to
+    to_state = next(to_it)  # get the first state we moved to
 
-    # first state is always 'open' with reporter as who created it
-    # open time is the time until someone touched it
-    state_history.append(('Open', issue.fields.reporter.displayName,
-                          get_datetime_from_property_holder(toState[0]) - get_datetime_from_property_holder(
+    state_history.append((to_state[1][0].fromString, issue.fields.reporter.displayName,
+                          get_datetime_from_property_holder(to_state[0]) - get_datetime_from_property_holder(
                               issue.fields)));
 
     # construct state from two adjacent transitions
-    for toState in ToIt:
-        fromState = next(fromIt)
+    for to_state in to_it:
+        fromState = next(from_it)
         state_history.append((fromState[1][0].toString, fromState[0].author.displayName,
-                              get_datetime_from_property_holder(toState[0]) - get_datetime_from_property_holder(
+                              get_datetime_from_property_holder(to_state[0]) - get_datetime_from_property_holder(
                                   fromState[0])))
 
     # add final state, and time it has been in that state (until now)
-    state_history.append((toState[1][0].toString, toState[0].author.displayName,
-                          datetime.now() - get_datetime_from_property_holder(toState[0])))
+    state_history.append((to_state[1][0].toString, to_state[0].author.displayName,
+                          datetime.now() - get_datetime_from_property_holder(to_state[0])))
 
     return state_history
 
@@ -172,9 +176,10 @@ def recursive_search_for_property_dict(top_level, match: dict) -> list:
         matches.append(top_level)
 
     # does the property holder have children (.items) ?
+    # note: this is a problem as it conflicts with pythons built-in items
     if hasattr(top_level, 'items'):
         for property_holder in top_level.items:
-            matches = matches + recursive_search_for_property_dict(property_holder, match)
+            matches += recursive_search_for_property_dict(property_holder, match)
 
     return matches
 
@@ -186,6 +191,20 @@ def get_datetime_from_property_holder(property_holder):
 
 def get_jira_date_string_from_datetime(d: datetime) -> str:
     return d.strftime('%Y-%m-%d')
+
+
+def get_full_changelog(jira_base_url: str, username: str, token: str, issue: str):
+    changes = []
+    url = f'{jira_base_url}rest/api/3/issue/{issue}/changelog'
+    while True:
+        result = requests.get(url, auth=requests.auth.HTTPBasicAuth(username, token))
+        res_obj = result.json()
+        changes.extend(res_obj['values'])
+        if res_obj['isLast']:
+            break;
+        url = res_obj['nextPage']
+
+    return [dict2resource(i) for i in changes]
 
 
 class TestGetJiraDate(unittest.TestCase):
